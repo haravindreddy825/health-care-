@@ -10,13 +10,33 @@ An advanced, login-free, privacy-preserving Smart Mirror web application designe
 ┌─────────────────────────────────────────────────────────────────────────────────────────────┐
 │                            AI-POWERED SMART MIRROR ARCHITECTURE                             │
 ├───────────────────────────────┬───────────────────────────────┬─────────────────────────────┤
-│ 1. Health Data Acquisition    │ 2. AI-Based Health Analysis   │ 3. Monitoring & Recomms     │
+│ 1. Health Data Acquisition    │ 2. Local Health Analysis      │ 3. Monitoring & Guidance    │
 ├───────────────────────────────┼───────────────────────────────┼─────────────────────────────┤
 │ • Face Image (Camera Matrix)  │ • Face & Alertness (OpenCV)   │ • Health Status & Scoring   │
 │ • Heart Rate (MAX30102 PPG)   │ • Posture Vector (MediaPipe)  │ • Expert System Decision    │
 │ • Temperature (IR Sensor)     │ • Fatigue Level (EAR Index)   │ • Dashboard & Report HUD    │
 └───────────────────────────────┴───────────────────────────────┴─────────────────────────────┘
 ```
+
+---
+
+## ⚡ Quick Start Guide (If you downloaded the ZIP file)
+
+### Option 1: Double-Click Launcher (Windows)
+1. Extract the downloaded ZIP file to any folder.
+2. Double-click **`start.bat`**.
+3. It will automatically install packages and launch the application at `http://localhost:5173`.
+
+### Option 2: Terminal / Command Prompt
+1. Open terminal inside the extracted folder:
+   ```bash
+   npm install
+   ```
+2. Start the local server:
+   ```bash
+   npm run dev
+   ```
+3. Open **`http://localhost:5173`** in your browser.
 
 ---
 
@@ -32,30 +52,12 @@ An advanced, login-free, privacy-preserving Smart Mirror web application designe
 
 ---
 
-## 🚀 Getting Started
+## 🛠️ Tech Stack
 
-### 1. Install Dependencies
-```bash
-npm install
-```
-
-### 2. Environment Configuration
-Create a `.env` file in the root directory:
-```env
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
-```
-
-### 3. Run Development Server
-```bash
-npm run dev
-```
-Open [http://localhost:5173](http://localhost:5173) in your browser.
-
-### 4. Production Build
-```bash
-npm run build
-```
+* **Frontend**: React 18, Vite, Tailwind CSS, Lucide Icons, Glassmorphism UI
+* **Vision & Sensing**: OpenCV.js, MediaPipe Face Mesh / Pose (Wasm-accelerated)
+* **Rule Engine**: Local Deterministic Weighted Deduction Health Engine
+* **Database**: Supabase (PostgreSQL with RLS) + Local Cache
 
 ---
 
