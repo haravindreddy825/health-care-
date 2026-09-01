@@ -7,16 +7,18 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Node modules & build artifacts
 node_modules
 dist
 dist-ssr
 *.local
 
-# Editor directories and files
+# Editor & OS files
 .vscode/*
 !.vscode/extensions.json
 .idea
 .DS_Store
+Thumbs.db
 *.suo
 *.ntvs*
 *.njsproj
@@ -27,6 +29,10 @@ dist-ssr
 .env
 .env.*
 !.env.example
+
+# Supabase CLI temp files
+supabase/.temp
+.temp
 
 # Antigravity / Gemini scratch & cache
 .gemini
