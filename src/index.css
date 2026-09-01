@@ -2,90 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  body {
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
-    background: linear-gradient(135deg, #050B18 0%, #0B1730 35%, #111C3D 70%, #24164A 100%);
-    background-attachment: fixed;
-    color: #f8fafc;
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
-  
-  code, pre, .font-mono {
-    font-family: 'JetBrains Mono', monospace;
-  }
+:root {
+  color-scheme: dark;
 }
 
-/* Glassmorphism Dark Cards */
-.glass-panel {
-  background: rgba(15, 23, 42, 0.72);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.1);
-}
-
-.glass-panel-cyan {
-  background: rgba(15, 23, 42, 0.80);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border: 1px solid rgba(34, 211, 238, 0.35);
-  box-shadow: 0 10px 30px rgba(34, 211, 238, 0.15);
-}
-
-/* Subtly animated pulse wave */
-@keyframes ecgPulse {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
-}
-
-.animate-ecg {
-  animation: ecgPulse 3.5s linear infinite;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.animate-fadeIn {
-  animation: fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-/* Custom Dark Scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: rgba(5, 11, 24, 0.8);
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(34, 211, 238, 0.3);
-  border-radius: 9999px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(34, 211, 238, 0.5);
-}
-
-/* Print Optimization */
-@media print {
-  body {
-    background: #ffffff !important;
-    color: #0f172a !important;
-  }
-  .no-print {
-    display: none !important;
-  }
-  #printable-report {
-    width: 100% !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    background: #ffffff !important;
-    color: #0f172a !important;
-  }
+body {
+  margin: 0;
+  min-height: 100vh;
+  background-color: #020617;
+  color: #f8fafc;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
 }
