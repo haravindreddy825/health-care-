@@ -46,18 +46,38 @@ export class FaceRecognitionService {
       }
     } catch (e) {}
 
-    // Default seed profile
-    const defaultProfile = {
-      id: 'usr_default_01',
-      name: 'Alex Rivera',
-      gender: 'Non-specified',
-      ageGroup: 'Adult',
-      faceDescriptor: [0.42, 0.55, 0.61, 0.48, 0.52, 0.39, 0.67, 0.44],
-      createdAt: new Date().toISOString(),
-      scanCount: 1
-    }
-    this.saveProfilesToStorage([defaultProfile])
-    return [defaultProfile]
+    // Default seed profiles
+    const defaultProfiles = [
+      {
+        id: 'USER-001',
+        name: 'Jaswanth',
+        gender: 'Male',
+        ageGroup: 'Young Adult (22)',
+        faceDescriptor: [0.42, 0.55, 0.61, 0.48, 0.52, 0.39, 0.67, 0.44],
+        createdAt: new Date(Date.now() - 86400000 * 3).toISOString(),
+        scanCount: 4
+      },
+      {
+        id: 'USER-002',
+        name: 'Rahul',
+        gender: 'Male',
+        ageGroup: 'Young Adult (23)',
+        faceDescriptor: [0.38, 0.49, 0.58, 0.51, 0.47, 0.43, 0.62, 0.49],
+        createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
+        scanCount: 2
+      },
+      {
+        id: 'USER-003',
+        name: 'Anjali',
+        gender: 'Female',
+        ageGroup: 'Young Adult (21)',
+        faceDescriptor: [0.45, 0.52, 0.64, 0.44, 0.56, 0.36, 0.71, 0.41],
+        createdAt: new Date(Date.now() - 86400000).toISOString(),
+        scanCount: 1
+      }
+    ]
+    this.saveProfilesToStorage(defaultProfiles)
+    return defaultProfiles
   }
 
   saveProfilesToStorage(profiles) {

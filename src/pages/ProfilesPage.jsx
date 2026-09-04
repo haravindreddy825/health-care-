@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
-import { Users, UserPlus, UserCheck, Trash2, CheckCircle2, ShieldCheck, User } from 'lucide-react'
-import { useSmartMirror } from '../context/SmartMirrorContext'
+import { Users, UserPlus, UserCheck, Trash2, CheckCircle2, ShieldCheck, User, Calendar, Activity } from 'lucide-react'
+import { useSmartMirror } from '../context/SmartMirrorContext.jsx'
 
 export function ProfilesPage() {
   const {
@@ -9,17 +9,20 @@ export function ProfilesPage() {
     switchProfile,
     createNewProfile,
     deleteProfile,
-    showToast
+    historyList
   } = useSmartMirror()
 
   const [newName, setNewName] = useState('')
+  const [newAge, setNewAge] = useState('')
+  const [newGender, setNewGender] = useState('Male')
   const [showAddForm, setShowAddForm] = useState(false)
 
   const handleCreate = (e) => {
     e.preventDefault()
     if (!newName.trim()) return
-    createNewProfile(newName.trim())
+    createNewProfile(newName.trim(), newAge.trim() || 'Young Adult', newGender)
     setNewName('')
+    setNewAge('')
     setShowAddForm(false)
   }
 
@@ -36,14 +39,14 @@ export function ProfilesPage() {
               </span>
               <span className="text-slate-600">•</span>
               <span className="text-slate-400 font-sans">
-                Active Profile: <strong className="text-white">{activeProfile?.name}</strong>
+                Active Profile: <strong className="text-white">{activeProfile?.name} ({activeProfile?.id})</strong>
               </span>
             </div>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight font-sans">
               User Profiles & Face Recognition
             </h2>
             <p className="text-slate-400 text-xs mt-0.5 font-sans font-normal">
-              Manage saved facial representations and isolate multi-session history comparison per user
+              Manage saved facial representations and isolate multi-session history comparison per individual user
             </p>
           </div>
 
@@ -60,20 +63,46 @@ export function ProfilesPage() {
         {showAddForm && (
           <form onSubmit={handleCreate} className="p-5 rounded-3xl bg-slate-950/80 border border-cyan-500/30 space-y-3 animate-fadeIn">
             <h3 className="text-sm font-bold text-white font-sans">Register New Smart Mirror Profile</h3>
-            <div className="flex flex-col sm:flex-row items-center gap-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               <input
                 type="text"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                placeholder="Enter user name (e.g. Jordan Lee)"
-                className="w-full p-3 rounded-xl bg-slate-900 border border-white/10 text-white font-sans text-xs focus:border-cyan-400 focus:outline-none"
+                placeholder="User Full Name (e.g. Jaswanth)"
+                className="p-3 rounded-xl bg-slate-900 border border-white/10 text-white font-sans text-xs focus:border-cyan-400 focus:outline-none"
                 autoFocus
+                required
               />
+              <input
+                type="text"
+                value={newAge}
+                onChange={(e) => setNewAge(e.target.value)}
+                placeholder="Age (e.g. 22)"
+                className="p-3 rounded-xl bg-slate-900 border border-white/10 text-white font-sans text-xs focus:border-cyan-400 focus:outline-none"
+              />
+              <select
+                value={newGender}
+                onChange={(e) => setNewGender(e.target.value)}
+                className="p-3 rounded-xl bg-slate-900 border border-white/10 text-white font-sans text-xs focus:border-cyan-400 focus:outline-none"
+              >
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowAddForm(false)}
+                className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 cursor-pointer"
+              >
+                Cancel
+              </button>
               <button
                 type="submit"
-                className="w-full sm:w-auto px-6 py-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold whitespace-nowrap cursor-pointer"
+                className="px-6 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold cursor-pointer"
               >
-                Save Profile
+                Save & Enroll Profile
               </button>
             </div>
           </form>
@@ -92,9 +121,9 @@ export function ProfilesPage() {
             return (
               <div
                 key={p.id}
-                className={`p-5 rounded-3xl border transition-all space-y-3 shadow-xl ${
+                className={`p-5 rounded-3xl border transition-all space-y-4 shadow-xl ${
                   isActive
-                    ? 'bg-slate-900/90 border-cyan-500/50 shadow-cyan-500/10'
+                    ? 'bg-slate-900/95 border-cyan-500/50 shadow-cyan-500/10'
                     : 'glass-panel border-white/10 hover:border-white/20'
                 }`}
               >
@@ -110,11 +139,11 @@ export function ProfilesPage() {
                         <h4 className="text-base font-bold text-white font-sans">{p.name}</h4>
                         {isActive && (
                           <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
-                            ACTIVE
+                            CURRENT USER
                           </span>
                         )}
                       </div>
-                      <span className="text-[10px] text-slate-500">ID: {p.id}</span>
+                      <span className="text-[10px] text-slate-400">Profile ID: <strong className="text-cyan-400">{p.id}</strong></span>
                     </div>
                   </div>
 
@@ -125,7 +154,7 @@ export function ProfilesPage() {
                         onClick={() => switchProfile(p.id)}
                         className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-750 text-cyan-300 text-xs font-bold transition-colors cursor-pointer"
                       >
-                        Select
+                        Switch To User
                       </button>
                     )}
 
@@ -141,9 +170,19 @@ export function ProfilesPage() {
                   </div>
                 </div>
 
-                <div className="p-3 rounded-2xl bg-slate-950/60 border border-white/5 flex items-center justify-between text-[11px] text-slate-400">
-                  <span>Facial Representation: <strong className="text-emerald-400">Enrolled</strong></span>
-                  <span>Created: {new Date(p.createdAt || Date.now()).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
+                <div className="grid grid-cols-2 gap-2 text-[11px] p-3 rounded-2xl bg-slate-950/60 border border-white/5">
+                  <div className="space-y-0.5">
+                    <span className="text-slate-500 text-[10px]">Demographics</span>
+                    <div className="font-bold text-slate-200">{p.gender || 'Male'} • {p.ageGroup || 'Young Adult'}</div>
+                  </div>
+
+                  <div className="space-y-0.5">
+                    <span className="text-slate-500 text-[10px]">Face Matrix</span>
+                    <div className="font-bold text-emerald-400 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" />
+                      Enrolled Vector
+                    </div>
+                  </div>
                 </div>
               </div>
             )
@@ -151,14 +190,14 @@ export function ProfilesPage() {
         </div>
       </div>
 
-      {/* 3. Privacy & Feature Vector Guarantee */}
+      {/* 3. Strict User Isolation Guarantee */}
       <div className="p-6 rounded-3xl glass-panel border-white/10 space-y-2 shadow-xl">
         <div className="flex items-center gap-2 text-emerald-400">
           <ShieldCheck className="w-4 h-4" />
-          <h4 className="text-xs font-bold uppercase tracking-wider font-sans">Biometric Privacy Guarantee</h4>
+          <h4 className="text-xs font-bold uppercase tracking-wider font-sans">Strict User Isolation Guarantee</h4>
         </div>
         <p className="text-xs text-slate-300 font-sans font-normal leading-relaxed">
-          Raw facial photos are processed in temporary browser memory. Only mathematical landmark geometry representations are stored to identify returning users across sessions.
+          Health histories and current-vs-previous delta comparisons are strictly computed between sessions belonging to the <strong>same user profile</strong>. Records from different individuals are never intermixed.
         </p>
       </div>
     </div>

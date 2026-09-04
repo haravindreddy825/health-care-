@@ -1,13 +1,13 @@
 import React, { useState } from 'react'
-import { CameraViewport } from '../components/hud/CameraViewport'
-import { DistanceGauge } from '../components/hud/DistanceGauge'
-import { ObservationControl } from '../components/hud/ObservationControl'
-import { SensorCard } from '../components/sensors/SensorCard'
-import { ReportModal } from '../components/analysis/ReportModal'
-import { HardwareConnectionModal } from '../components/sensors/HardwareConnectionModal'
-import { DemoSimulationDrawer } from '../components/sensors/DemoSimulationDrawer'
-import { useSmartMirror } from '../context/SmartMirrorContext'
-import { Sparkles, Cpu, Sliders, CheckCircle2, User, Eye, UserCheck } from 'lucide-react'
+import { CameraViewport } from '../components/hud/CameraViewport.jsx'
+import { DistanceGauge } from '../components/hud/DistanceGauge.jsx'
+import { ObservationControl } from '../components/hud/ObservationControl.jsx'
+import { SensorCard } from '../components/sensors/SensorCard.jsx'
+import { ReportModal } from '../components/analysis/ReportModal.jsx'
+import { HardwareConnectionModal } from '../components/sensors/HardwareConnectionModal.jsx'
+import { DemoSimulationDrawer } from '../components/sensors/DemoSimulationDrawer.jsx'
+import { useSmartMirror } from '../context/SmartMirrorContext.jsx'
+import { Sparkles, Cpu, Sliders, CheckCircle2, User, Eye, UserCheck, ShieldCheck } from 'lucide-react'
 
 export function MirrorHUDPage() {
   const {
@@ -24,8 +24,6 @@ export function MirrorHUDPage() {
   const [isDemoDrawerOpen, setIsDemoDrawerOpen] = useState(false)
   const [isReportOpen, setIsReportOpen] = useState(false)
 
-  const isObserving = mirrorState === 'OBSERVING'
-
   return (
     <div className="w-full max-w-7xl mx-auto space-y-5 animate-fadeIn pb-8">
       
@@ -38,11 +36,11 @@ export function MirrorHUDPage() {
           <div>
             <div className="flex items-center gap-2">
               <span className="text-white font-bold font-sans text-sm">
-                Welcome, {activeProfile?.name || 'User'}
+                Welcome back, {activeProfile?.name || 'Jaswanth'}
               </span>
               <span className="text-slate-600">•</span>
               <span className="text-emerald-400 font-bold">
-                {activeProfile?.scanCount ? `Returning User (${activeProfile.scanCount} scans)` : 'New Session'}
+                {activeProfile?.scanCount ? `Registered User (${activeProfile.scanCount} scans)` : 'Active Profile'}
               </span>
             </div>
             <p className="text-[11px] text-slate-400">
@@ -58,7 +56,7 @@ export function MirrorHUDPage() {
             className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-850 border border-white/10 text-slate-200 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
           >
             <Cpu className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Connect Hardware</span>
+            <span>Hardware Status</span>
           </button>
 
           <button
@@ -90,6 +88,7 @@ export function MirrorHUDPage() {
             <SensorCard sensor={sensorsState.heartRate} />
             <SensorCard sensor={sensorsState.spo2} />
             <SensorCard sensor={sensorsState.temperature} />
+            <SensorCard sensor={sensorsState.distance} />
           </div>
 
           {/* Optical Posture & Fatigue Quick Bar */}

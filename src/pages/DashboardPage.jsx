@@ -12,12 +12,20 @@ import {
   Play,
   Calendar,
   ShieldCheck,
-  User
+  User,
+  Bell,
+  Check,
+  Eye,
+  Camera,
+  ArrowUpRight,
+  ArrowDownRight,
+  Minus
 } from 'lucide-react'
-import { WellnessScoreGauge } from '../components/analysis/WellnessScoreGauge'
-import { TrendChart } from '../components/ui/TrendChart'
-import { SensorCard } from '../components/sensors/SensorCard'
-import { useSmartMirror } from '../context/SmartMirrorContext'
+import { WellnessScoreGauge } from '../components/analysis/WellnessScoreGauge.jsx'
+import { TrendChart } from '../components/ui/TrendChart.jsx'
+import { SensorCard } from '../components/sensors/SensorCard.jsx'
+import { StatusBadge } from '../components/ui/StatusBadge.jsx'
+import { useSmartMirror } from '../context/SmartMirrorContext.jsx'
 
 export function DashboardPage() {
   const {
@@ -27,6 +35,10 @@ export function DashboardPage() {
     latestComparison,
     historyList,
     weather,
+    cameraState,
+    visionState,
+    reminders,
+    toggleReminder,
     startObservationWorkflow,
     setActiveTab
   } = useSmartMirror()
@@ -35,7 +47,7 @@ export function DashboardPage() {
   const healthStatus = latestReport?.healthStatus ?? (historyList[0]?.health_analysis?.[0]?.health_status || 'Healthy')
   const riskLevel = latestReport?.riskLevel ?? (historyList[0]?.health_analysis?.[0]?.risk_level || 'LOW')
 
-  // Extract past score trend numbers
+  // Extract past score trend numbers for the active user
   const scoreTrendData = historyList
     .slice(0, 10)
     .reverse()
@@ -58,11 +70,11 @@ export function DashboardPage() {
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="text-[10px] font-bold uppercase tracking-widest text-cyan-300 bg-cyan-500/15 px-3 py-0.5 rounded-full border border-cyan-500/30">
-                EXECUTIVE HEALTH DASHBOARD
+                SMART MIRROR EXECUTIVE DASHBOARD
               </span>
               <span className="text-slate-600">•</span>
               <span className="text-slate-400 font-sans">
-                Profile: <strong className="text-white">{activeProfile?.name}</strong>
+                Active Profile: <strong className="text-white">{activeProfile?.name}</strong>
               </span>
             </div>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight font-sans">
@@ -153,7 +165,95 @@ export function DashboardPage() {
         </div>
       </div>
 
-      {/* 3. Weather & Optical Indicators Row */}
+      {/* 3. Recovery Trend & Smart Reminders Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+        
+        {/* Recovery Analysis (6 Cols) */}
+        <div className="lg:col-span-6 p-6 rounded-3xl glass-panel border-white/10 space-y-4 shadow-xl">
+          <div className="flex items-center justify-between border-b border-white/10 pb-3">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-emerald-400" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-white font-sans">
+                Longitudinal Recovery Trend
+              </h3>
+            </div>
+            <StatusBadge status={latestComparison?.overallTrend || 'STABLE'} size="xs" />
+          </div>
+
+          <p className="text-slate-300 font-sans text-xs leading-relaxed">
+            {latestComparison?.overallTrend === 'IMPROVING'
+              ? 'Wellness trend appears to be improving compared to your previous baseline scan.'
+              : latestComparison?.overallTrend === 'NEEDS ATTENTION'
+              ? 'Wellness trend indicates one or more indicators require attention.'
+              : 'Wellness indicators remain stable and consistent with your historical baseline.'}
+          </p>
+
+          <div className="grid grid-cols-2 gap-3 pt-1">
+            <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-white/5 space-y-1">
+              <span className="text-[10px] text-slate-500 uppercase font-bold">Wellness Score Delta</span>
+              <div className="text-base font-extrabold text-white flex items-center gap-1">
+                {latestComparison?.scoreDelta != null ? (
+                  latestComparison.scoreDelta >= 0 ? (
+                    <span className="text-emerald-400 flex items-center">+{latestComparison.scoreDelta} pts <ArrowUpRight className="w-4 h-4" /></span>
+                  ) : (
+                    <span className="text-cyan-400 flex items-center">{latestComparison.scoreDelta} pts <ArrowDownRight className="w-4 h-4" /></span>
+                  )
+                ) : 'Baseline'}
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-white/5 space-y-1">
+              <span className="text-[10px] text-slate-500 uppercase font-bold">Heart Rate Shift</span>
+              <div className="text-base font-extrabold text-white">
+                {latestComparison?.heartRateDelta != null
+                  ? `${latestComparison.heartRateDelta > 0 ? '+' : ''}${latestComparison.heartRateDelta} BPM`
+                  : 'Stable'}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Smart Reminders Panel (6 Cols) */}
+        <div className="lg:col-span-6 p-6 rounded-3xl glass-panel border-white/10 space-y-4 shadow-xl">
+          <div className="flex items-center justify-between border-b border-white/10 pb-3">
+            <div className="flex items-center gap-2">
+              <Bell className="w-4 h-4 text-amber-400" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-white font-sans">
+                Smart Mirror Daily Reminders
+              </h3>
+            </div>
+            <span className="text-amber-400 text-[10px] font-bold">ACTIVE</span>
+          </div>
+
+          <div className="space-y-2">
+            {reminders.map((rem) => (
+              <div
+                key={rem.id}
+                onClick={() => toggleReminder(rem.id)}
+                className={`p-3 rounded-2xl border transition-all flex items-center justify-between cursor-pointer ${
+                  rem.enabled
+                    ? 'bg-slate-950/80 border-cyan-500/30 text-white'
+                    : 'bg-slate-950/40 border-white/5 text-slate-500 opacity-60'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className={`w-5 h-5 rounded-lg border flex items-center justify-center ${
+                    rem.enabled ? 'bg-cyan-500 border-cyan-400 text-slate-950' : 'border-slate-700'
+                  }`}>
+                    {rem.enabled && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold font-sans block">{rem.title}</span>
+                    <span className="text-[10px] text-slate-400">{rem.time} • {rem.category}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* 4. Weather & Vision Matrix Row */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         
         {/* Ambient Weather Card (6 Cols) */}

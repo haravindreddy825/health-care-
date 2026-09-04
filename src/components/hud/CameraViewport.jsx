@@ -1,12 +1,12 @@
 import React, { useEffect, useRef } from 'react'
-import { Camera, CameraOff, AlertCircle, RefreshCw, CheckCircle2, User, Eye } from 'lucide-react'
-import { cameraManager } from '../../services/vision/CameraManager'
-import { faceRecognitionService } from '../../services/vision/FaceRecognitionService'
-import { useSmartMirror } from '../../context/SmartMirrorContext'
+import { Camera, CameraOff, AlertCircle, RefreshCw, CheckCircle2, User, Eye, Ruler } from 'lucide-react'
+import { cameraManager } from '../../services/vision/CameraManager.js'
+import { faceRecognitionService } from '../../services/vision/FaceRecognitionService.js'
+import { useSmartMirror } from '../../context/SmartMirrorContext.jsx'
 
 export function CameraViewport({ className = '' }) {
   const videoRef = useRef(null)
-  const { cameraState, visionState, mirrorState, activeProfile } = useSmartMirror()
+  const { cameraState, visionState, mirrorState, activeProfile, sensorsState } = useSmartMirror()
 
   useEffect(() => {
     if (videoRef.current) {
@@ -31,7 +31,30 @@ export function CameraViewport({ className = '' }) {
     }
   }
 
-  const { faceDetected, box, posture, fatigue, earValue, recognizedUser } = visionState
+  const { faceDetected, posture, fatigue, earValue, recognizedUser } = visionState
+  const effectiveDistance = sensorsState.distance.reading ?? visionState.estimatedDistance
+
+  // Distance Guidance Message
+  let distanceGuidance = 'Looking for user...'
+  let guidanceColor = 'text-slate-400'
+  if (!faceDetected) {
+    distanceGuidance = '○ Seeking user — Please stand in front of the mirror'
+    guidanceColor = 'text-slate-400'
+  } else if (effectiveDistance !== null) {
+    if (effectiveDistance >= 50 && effectiveDistance <= 80) {
+      distanceGuidance = '✓ Optimal Distance — Ready for health analysis'
+      guidanceColor = 'text-emerald-400'
+    } else if (effectiveDistance < 50) {
+      distanceGuidance = '⚠ Too close — Please step slightly back'
+      guidanceColor = 'text-amber-400'
+    } else {
+      distanceGuidance = '→ Move closer into 50–80 cm range'
+      guidanceColor = 'text-cyan-400'
+    }
+  } else {
+    distanceGuidance = '✓ Person detected'
+    guidanceColor = 'text-emerald-400'
+  }
 
   return (
     <div className={`relative w-full aspect-[4/3] sm:aspect-[16/10] md:aspect-[16/9] rounded-[36px] overflow-hidden bg-slate-950 border border-cyan-500/30 shadow-2xl ${className}`}>
@@ -45,7 +68,7 @@ export function CameraViewport({ className = '' }) {
         className="absolute inset-0 w-full h-full object-cover scale-x-[-1] opacity-100 z-10"
       />
 
-      {/* 2. Ultra-Subtle Ambient Mirror Glare (Does NOT obscure face) */}
+      {/* 2. Ultra-Subtle Ambient Mirror Glare */}
       <div className="absolute inset-0 z-20 pointer-events-none bg-gradient-to-tr from-slate-950/20 via-transparent to-cyan-500/5" />
 
       {/* 3. Camera Error / Permission Fallback */}
@@ -55,7 +78,7 @@ export function CameraViewport({ className = '' }) {
             <CameraOff className="w-8 h-8" />
           </div>
           <div className="space-y-1 max-w-md">
-            <h3 className="text-lg font-bold text-white">Camera Initialization Required</h3>
+            <h3 className="text-lg font-bold text-white font-sans">Camera Initialization Required</h3>
             <p className="text-xs text-slate-400 leading-relaxed font-mono">
               {cameraState.error || 'Please grant camera access to activate the Smart Mirror vision matrix.'}
             </p>
@@ -97,7 +120,7 @@ export function CameraViewport({ className = '' }) {
             </span>
             {faceDetected && (
               <span className="text-emerald-400">
-                {visionState.estimatedDistance ? `${visionState.estimatedDistance} cm` : 'Optimal'}
+                {effectiveDistance ? `${effectiveDistance} cm` : 'Optimal'}
               </span>
             )}
           </div>
@@ -122,19 +145,25 @@ export function CameraViewport({ className = '' }) {
         {recognizedUser && (
           <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/15 backdrop-blur-md border border-emerald-500/30 text-emerald-300 text-xs font-mono font-bold">
             <CheckCircle2 className="w-3.5 h-3.5" />
-            <span>Welcome, {recognizedUser.name}</span>
+            <span>Welcome back, {recognizedUser.name}</span>
           </div>
         )}
       </div>
 
-      {/* 7. Bottom Left Optical Specs */}
-      <div className="absolute bottom-4 left-4 z-30 hidden sm:flex items-center gap-2 font-mono text-[10px] text-slate-300">
-        <span className="px-2.5 py-1 rounded-xl bg-slate-950/80 border border-white/10">
-          EAR: {earValue}
-        </span>
-        <span className="px-2.5 py-1 rounded-xl bg-slate-950/80 border border-white/10">
-          Tilt: {visionState.tiltAngle}°
-        </span>
+      {/* 7. Bottom Dynamic Guidance Pill */}
+      <div className="absolute bottom-4 inset-x-4 z-30 flex items-center justify-between pointer-events-none">
+        <div className="px-3.5 py-1.5 rounded-2xl bg-slate-950/85 backdrop-blur-md border border-white/10 font-mono text-xs font-bold flex items-center gap-2">
+          <span className={guidanceColor}>{distanceGuidance}</span>
+        </div>
+
+        <div className="hidden sm:flex items-center gap-2 font-mono text-[10px] text-slate-300">
+          <span className="px-2.5 py-1 rounded-xl bg-slate-950/80 border border-white/10">
+            EAR: {earValue}
+          </span>
+          <span className="px-2.5 py-1 rounded-xl bg-slate-950/80 border border-white/10">
+            Tilt: {visionState.tiltAngle}°
+          </span>
+        </div>
       </div>
 
       {/* 8. Countdown Overlay (3... 2... 1...) */}

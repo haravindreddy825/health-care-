@@ -1,13 +1,20 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react'
-import { sensorManager } from '../services/sensors/SensorManager'
-import { cameraManager } from '../services/vision/CameraManager'
-import { faceRecognitionService } from '../services/vision/FaceRecognitionService'
-import { analyzeHealthTelemetry } from '../services/analysis/HealthAnalysisEngine'
-import { sessionHistoryService } from '../services/history/SessionHistoryService'
-import { weatherService } from '../services/weather/WeatherService'
-import { voiceControlService } from '../services/voice/VoiceControlService'
+import { sensorManager } from '../services/sensors/SensorManager.js'
+import { cameraManager } from '../services/vision/CameraManager.js'
+import { faceRecognitionService } from '../services/vision/FaceRecognitionService.js'
+import { analyzeHealthTelemetry } from '../services/analysis/HealthAnalysisEngine.js'
+import { sessionHistoryService } from '../services/history/SessionHistoryService.js'
+import { weatherService } from '../services/weather/WeatherService.js'
+import { voiceControlService } from '../services/voice/VoiceControlService.js'
 
 const SmartMirrorContext = createContext(null)
+
+const DEFAULT_REMINDERS = [
+  { id: 'rem-1', title: 'Hydration Interval (250ml)', time: 'Hourly', category: 'Hydration', enabled: true },
+  { id: 'rem-2', title: 'Cervical Spine Realignment', time: 'Every 45m', category: 'Posture', enabled: true },
+  { id: 'rem-3', title: '20-20-20 Visual Eye Rest', time: 'Every 20m', category: 'Vision', enabled: true },
+  { id: 'rem-4', title: 'Dim Displays & Wind-Down', time: '9:30 PM', category: 'Sleep', enabled: true }
+]
 
 export function SmartMirrorProvider({ children }) {
   // Navigation: 'mirror' | 'dashboard' | 'sensors' | 'analysis' | 'history' | 'recommendations' | 'profiles' | 'settings'
@@ -15,10 +22,11 @@ export function SmartMirrorProvider({ children }) {
 
   // User Profile State
   const [profiles, setProfiles] = useState(() => faceRecognitionService.getAllProfiles())
-  const [activeProfile, setActiveProfile] = useState(() => profiles[0] || { id: 'usr_default_01', name: 'Alex Rivera' })
+  const [activeProfile, setActiveProfile] = useState(() => profiles[0] || { id: 'usr_default_01', name: 'Jaswanth' })
 
   // Sensors & Hardware State
   const [sensorsState, setSensorsState] = useState(sensorManager.sensors)
+  const [hardwareMetrics, setHardwareMetrics] = useState(sensorManager.hardwareMetrics)
   const [isDemoMode, setIsDemoMode] = useState(sensorManager.isDemoMode)
   const [activeProviderName, setActiveProviderName] = useState('None')
 
@@ -59,6 +67,16 @@ export function SmartMirrorProvider({ children }) {
   const [voiceStatus, setVoiceStatus] = useState('Voice control idle')
   const [isVoiceListening, setIsVoiceListening] = useState(false)
 
+  // Smart Mirror Reminders
+  const [reminders, setReminders] = useState(() => {
+    try {
+      const saved = localStorage.getItem('smart_mirror_reminders_v1')
+      return saved ? JSON.parse(saved) : DEFAULT_REMINDERS
+    } catch (e) {
+      return DEFAULT_REMINDERS
+    }
+  })
+
   // Toast notifications
   const [toast, setToast] = useState(null)
 
@@ -82,7 +100,8 @@ export function SmartMirrorProvider({ children }) {
       if (!isMountedRef.current) return
       setSensorsState({ ...data.sensors })
       setIsDemoMode(data.isDemoMode)
-      setActiveProviderName(data.activeProviderName)
+      if (data.hardwareMetrics) setHardwareMetrics({ ...data.hardwareMetrics })
+      setActiveProviderName(data.activeProviderName || 'None')
     })
 
     // Subscribe to Camera
@@ -169,7 +188,6 @@ export function SmartMirrorProvider({ children }) {
     if (mirrorState === 'IDLE' && visionState.faceDetected) {
       setMirrorState('PERSON_DETECTED')
     } else if (mirrorState === 'PERSON_DETECTED' && !visionState.faceDetected) {
-      // Return to IDLE after a short pause if person leaves
       const t = setTimeout(() => {
         if (mirrorState === 'PERSON_DETECTED' && !visionState.faceDetected) {
           setMirrorState('IDLE')
@@ -227,7 +245,7 @@ export function SmartMirrorProvider({ children }) {
   const finalizeObservation = useCallback(async () => {
     const stabilized = sensorManager.getStabilizedSessionReading()
 
-    // Deterministic Rule Engine Analysis
+    // Deterministic Rule Engine Analysis (Excludes disconnected sensors without penalty)
     const analysis = analyzeHealthTelemetry({
       heartRate: stabilized.heartRate,
       spo2: stabilized.spo2,
@@ -245,7 +263,7 @@ export function SmartMirrorProvider({ children }) {
 
     // Compute same-user comparison with previous session of this exact user
     const previousSession = historyList[0] || null
-    const comparison = sessionHistoryService.getSameUserComparison(
+    sessionHistoryService.getSameUserComparison(
       { id: sid, session_id: sid, reading: stabilized, health_analysis: [{ wellness_score: analysis.wellnessScore }] },
       activeProfile.id
     ).then(comp => {
@@ -293,7 +311,7 @@ export function SmartMirrorProvider({ children }) {
     }
   }
 
-  const createNewProfile = (name) => {
+  const createNewProfile = (name, age = 'Adult', gender = 'Unspecified') => {
     const newP = faceRecognitionService.createNewProfile(name)
     const updated = faceRecognitionService.getAllProfiles()
     setProfiles(updated)
@@ -301,7 +319,7 @@ export function SmartMirrorProvider({ children }) {
     if (created) {
       setActiveProfile(created)
       loadUserHistory(created.id)
-      showToast(`Created new profile: ${created.name}`)
+      showToast(`Created new profile for ${created.name}`)
     }
   }
 
@@ -315,7 +333,29 @@ export function SmartMirrorProvider({ children }) {
     showToast('Profile deleted')
   }
 
-  // --- 7. Voice & Demo Helpers ---
+  // --- 7. Reminder Management ---
+
+  const toggleReminder = (id) => {
+    const updated = reminders.map(r => r.id === id ? { ...r, enabled: !r.enabled } : r)
+    setReminders(updated)
+    try { localStorage.setItem('smart_mirror_reminders_v1', JSON.stringify(updated)) } catch (e) {}
+  }
+
+  const addReminder = (title, time, category = 'General') => {
+    const newR = { id: `rem-${Date.now()}`, title, time, category, enabled: true }
+    const updated = [newR, ...reminders]
+    setReminders(updated)
+    try { localStorage.setItem('smart_mirror_reminders_v1', JSON.stringify(updated)) } catch (e) {}
+    showToast('Reminder added')
+  }
+
+  const deleteReminder = (id) => {
+    const updated = reminders.filter(r => r.id !== id)
+    setReminders(updated)
+    try { localStorage.setItem('smart_mirror_reminders_v1', JSON.stringify(updated)) } catch (e) {}
+  }
+
+  // --- 8. Voice & Demo Helpers ---
 
   const toggleVoiceListening = () => {
     if (isVoiceListening) {
@@ -325,7 +365,7 @@ export function SmartMirrorProvider({ children }) {
     } else {
       const ok = voiceControlService.startListening()
       setIsVoiceListening(ok)
-      if (ok) showToast('Listening for voice commands: "Start analysis", "Show dashboard", "Show history"')
+      if (ok) showToast('Listening for voice commands: "Start health analysis", "Show dashboard", "Show history"')
     }
   }
 
@@ -341,7 +381,7 @@ export function SmartMirrorProvider({ children }) {
   const setDemoMode = (enabled) => {
     sensorManager.setDemoMode(enabled)
     setIsDemoMode(enabled)
-    showToast(enabled ? 'DEMO MODE ACTIVATED: Simulated sensor data active' : 'DEMO MODE DEACTIVATED: Waiting for real hardware')
+    showToast(enabled ? 'DEMO MODE ACTIVATED: Simulated sensor data active' : 'DEMO MODE DEACTIVATED: Waiting for physical sensors')
   }
 
   const applyDemoPreset = (presetId) => {
@@ -373,6 +413,7 @@ export function SmartMirrorProvider({ children }) {
 
         // Sensors & Hardware
         sensorsState,
+        hardwareMetrics,
         isDemoMode,
         setDemoMode,
         applyDemoPreset,
@@ -402,6 +443,12 @@ export function SmartMirrorProvider({ children }) {
         isHistoryLoading,
         loadUserHistory,
         clearAllData,
+
+        // Reminders
+        reminders,
+        toggleReminder,
+        addReminder,
+        deleteReminder,
 
         // Weather & Voice
         weather,

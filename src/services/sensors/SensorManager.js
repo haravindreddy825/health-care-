@@ -5,12 +5,14 @@ import { DemoSensorProvider, DEMO_PRESETS } from './DemoSensorProvider.js'
 
 /**
  * SensorManager
- * Central hardware abstraction managing physical medical sensors and simulation.
+ * Central hardware abstraction managing physical biomedical sensors and demo simulation.
  * 
  * STRICT COMPLIANCE:
- * - If physical sensor is disconnected and Demo Mode is OFF:
+ * - When physical sensor is disconnected:
  *   reading = null, connected = false, source = 'unavailable'.
- * - Simulated values only exist when isDemoMode = true (source = 'demo').
+ * - Disconnected sensors are NEVER penalized in wellness scoring.
+ * - Stale packet watchdog: If no data packet is received within 3.5s,
+ *   sensors are immediately updated to disconnected state.
  */
 export class SensorManager {
   constructor() {
@@ -23,6 +25,16 @@ export class SensorManager {
     this.isDemoMode = false
     this.listeners = new Set()
 
+    // Hardware status metrics
+    this.hardwareMetrics = {
+      isBridgeConnected: false,
+      hardwarePort: null,
+      packetCount: 0,
+      packetRateHz: 0,
+      lastPacketTime: null,
+      rawLogStream: []
+    }
+
     // Internal sensor state registry
     this.sensors = {
       heartRate: {
@@ -34,6 +46,7 @@ export class SensorManager {
         unit: 'BPM',
         minNormal: 60,
         maxNormal: 100,
+        sensorHardware: 'MAX30102 PPG',
         lastUpdated: null,
         error: null,
         source: 'unavailable' // 'hardware' | 'demo' | 'unavailable'
@@ -47,6 +60,7 @@ export class SensorManager {
         unit: '%',
         minNormal: 95,
         maxNormal: 100,
+        sensorHardware: 'MAX30102 PPG',
         lastUpdated: null,
         error: null,
         source: 'unavailable'
@@ -60,6 +74,7 @@ export class SensorManager {
         unit: '°C',
         minNormal: 36.1,
         maxNormal: 37.2,
+        sensorHardware: 'Contactless IR / Thermistor',
         lastUpdated: null,
         error: null,
         source: 'unavailable'
@@ -73,23 +88,24 @@ export class SensorManager {
         unit: 'cm',
         optimalMin: 50,
         optimalMax: 80,
-        proximityStatus: 'Sensor Not Connected', // 'Optimal' | 'Please move closer' | 'Too close' | 'Sensor Not Connected'
+        sensorHardware: 'HC-SR04 / VL53L0X',
+        proximityStatus: 'Sensor Not Connected',
         lastUpdated: null,
         error: null,
         source: 'unavailable'
       },
-      // Computer vision indicators
+      // Vision indicators
       posture: {
         id: 'posture',
         name: 'Spinal Posture',
-        reading: 'Good', // 'Good' | 'Needs Improvement' | 'Poor'
+        reading: 'Good',
         source: 'vision',
         lastUpdated: null
       },
       fatigue: {
         id: 'fatigue',
         name: 'Alertness & Fatigue',
-        reading: 'Low', // 'Low' | 'Moderate' | 'High'
+        reading: 'Low',
         source: 'vision',
         lastUpdated: null
       }
@@ -98,11 +114,48 @@ export class SensorManager {
     // Rolling sample buffer for observation averaging
     this.sampleBuffer = []
 
+    // Stale watchdog timer
+    this.watchdogTimer = null
+    this.packetTimes = []
+
     // Attach provider callbacks
-    this.serialProvider.onData((data) => this.handleIncomingTelemetry(data))
-    this.bluetoothProvider.onData((data) => this.handleIncomingTelemetry(data))
-    this.bridgeProvider.onData((data) => this.handleIncomingTelemetry(data))
-    this.demoProvider.onData((data) => this.handleIncomingTelemetry(data))
+    this.serialProvider.onData((data) => this.handleIncomingTelemetry(data, 'Web Serial USB'))
+    this.bluetoothProvider.onData((data) => this.handleIncomingTelemetry(data, 'Bluetooth BLE'))
+    this.bridgeProvider.onData((data) => this.handleIncomingTelemetry(data, 'Python Sensor Bridge'))
+    this.demoProvider.onData((data) => this.handleIncomingTelemetry(data, 'Demo Simulator'))
+
+    this.bridgeProvider.onStatusChange((isConnected, msg) => {
+      this.hardwareMetrics.isBridgeConnected = isConnected
+      this.notifyListeners()
+    })
+
+    // Start background auto-discovery for local sensor bridge
+    this.startBackgroundDiscovery()
+    this.startWatchdog()
+  }
+
+  startBackgroundDiscovery() {
+    if (typeof window !== 'undefined') {
+      // Auto-connect to local sensor bridge
+      this.bridgeProvider.connect({ url: 'ws://localhost:8765' }).catch(() => {})
+    }
+  }
+
+  startWatchdog() {
+    if (this.watchdogTimer) clearInterval(this.watchdogTimer)
+    this.watchdogTimer = setInterval(() => {
+      const now = Date.now()
+      // If hardware was active but no packet received in > 3.5s, mark disconnected
+      if (
+        !this.isDemoMode &&
+        this.hardwareMetrics.lastPacketTime &&
+        now - this.hardwareMetrics.lastPacketTime > 3500 &&
+        (this.sensors.heartRate.connected || this.sensors.temperature.connected)
+      ) {
+        this.resetSensorsToUnavailable()
+        this.hardwareMetrics.packetRateHz = 0
+      }
+    }, 1000)
   }
 
   // --- Provider Management ---
@@ -134,8 +187,6 @@ export class SensorManager {
     if (this.bridgeProvider.isConnected) await this.bridgeProvider.disconnect()
     this.demoProvider.stop()
     this.activeHardwareProvider = null
-
-    // Reset to unavailable
     this.resetSensorsToUnavailable()
   }
 
@@ -155,11 +206,6 @@ export class SensorManager {
   applyDemoPreset(presetId) {
     if (!this.isDemoMode) this.setDemoMode(true)
     this.demoProvider.applyPreset(presetId)
-  }
-
-  setDemoCustomValues(values) {
-    if (!this.isDemoMode) this.setDemoMode(true)
-    this.demoProvider.setValues(values)
   }
 
   // --- Optical Updates (from Camera & Face Mesh) ---
@@ -186,9 +232,37 @@ export class SensorManager {
 
   // --- Telemetry Ingestion ---
 
-  handleIncomingTelemetry(data) {
+  handleIncomingTelemetry(data, providerName = 'Hardware') {
     const now = data.timestamp || new Date().toISOString()
     const src = data.source || 'hardware'
+    const nowMs = Date.now()
+
+    if (src === 'hardware') {
+      this.hardwareMetrics.lastPacketTime = nowMs
+      this.hardwareMetrics.packetCount += 1
+      this.hardwareMetrics.hardwarePort = data.port || 'USB-SERIAL'
+
+      // Calculate packet frequency (Hz)
+      this.packetTimes.push(nowMs)
+      if (this.packetTimes.length > 20) this.packetTimes.shift()
+      if (this.packetTimes.length >= 2) {
+        const spanSec = (this.packetTimes[this.packetTimes.length - 1] - this.packetTimes[0]) / 1000
+        if (spanSec > 0) {
+          this.hardwareMetrics.packetRateHz = parseFloat(((this.packetTimes.length - 1) / spanSec).toFixed(1))
+        }
+      }
+
+      // Append to live raw log stream
+      if (data.raw) {
+        this.hardwareMetrics.rawLogStream.unshift({
+          time: new Date().toLocaleTimeString(),
+          raw: typeof data.raw === 'string' ? data.raw.trim() : JSON.stringify(data.raw)
+        })
+        if (this.hardwareMetrics.rawLogStream.length > 30) {
+          this.hardwareMetrics.rawLogStream.pop()
+        }
+      }
+    }
 
     // Heart Rate
     if (data.heartRate !== undefined) {
@@ -229,7 +303,7 @@ export class SensorManager {
       this.sensors.distance.error = null
     }
 
-    // Vision Fallbacks from Demo
+    // Demo Vision updates
     if (data.posture && src === 'demo') {
       this.sensors.posture.reading = data.posture
       this.sensors.posture.source = 'demo'
@@ -241,7 +315,7 @@ export class SensorManager {
       this.sensors.fatigue.lastUpdated = now
     }
 
-    // Add to rolling observation buffer
+    // Sample buffer for observation
     this.sampleBuffer.push({
       heartRate: this.sensors.heartRate.reading,
       spo2: this.sensors.spo2.reading,
@@ -252,7 +326,7 @@ export class SensorManager {
       timestamp: Date.now()
     })
 
-    if (this.sampleBuffer.length > 100) {
+    if (this.sampleBuffer.length > 120) {
       this.sampleBuffer.shift()
     }
 
@@ -279,14 +353,13 @@ export class SensorManager {
     this.notifyListeners()
   }
 
-  // --- Observation Finalization & Stabilized Average ---
+  // --- Observation Finalization ---
 
   clearBuffer() {
     this.sampleBuffer = []
   }
 
   getStabilizedSessionReading() {
-    // If buffer has samples, compute trimmed median/average for noise immunity
     if (this.sampleBuffer.length >= 3) {
       const validHR = this.sampleBuffer.map(s => s.heartRate).filter(v => v !== null && !isNaN(v))
       const validSpO2 = this.sampleBuffer.map(s => s.spo2).filter(v => v !== null && !isNaN(v))
@@ -337,7 +410,11 @@ export class SensorManager {
 
   subscribe(listener) {
     this.listeners.add(listener)
-    listener({ sensors: { ...this.sensors }, isDemoMode: this.isDemoMode })
+    listener({
+      sensors: { ...this.sensors },
+      isDemoMode: this.isDemoMode,
+      hardwareMetrics: { ...this.hardwareMetrics }
+    })
     return () => this.listeners.delete(listener)
   }
 
@@ -345,7 +422,10 @@ export class SensorManager {
     const payload = {
       sensors: { ...this.sensors },
       isDemoMode: this.isDemoMode,
-      activeProviderName: this.activeHardwareProvider?.name || (this.isDemoMode ? 'Demo Simulator' : 'None')
+      hardwareMetrics: { ...this.hardwareMetrics },
+      activeProviderName: this.hardwareMetrics.isBridgeConnected
+        ? 'Python Hardware Bridge (Live)'
+        : (this.activeHardwareProvider?.name || (this.isDemoMode ? 'Demo Simulator' : 'None'))
     }
     this.listeners.forEach(cb => {
       try { cb(payload) } catch (e) {}
